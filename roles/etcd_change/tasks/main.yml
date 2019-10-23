@@ -1,0 +1,73 @@
+- name: Stop the systemd patroni service
+  shell: systemctl stop patroni.service
+
+
+- name: Stop the systemd etcd service
+  shell: systemctl stop etcd.service
+ 
+# create the hosts file
+- template:
+    src: hosts.j2
+    dest: /etc/hosts
+    owner: root
+    group: root
+    mode: 0644
+ 
+- template:
+    src: etcd.conf.j2
+    dest: /u01/app/{{ postgres_user }}/local/dmk/etc/etcd.conf
+    owner: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+    mode: 0700
+ 
+- file:
+    path: /u02/pgdata/etcd
+    state: directory
+    mode: 0700
+    recurse: yes
+    owner: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+
+- name: delete old etcd data folder
+  file:
+    path: /u02/pgdata/etcd
+    state: absent
+  become: yes
+ 
+- name: force systemd to reread configs
+  systemd:
+    daemon_reload: yes
+ 
+- name: Start the systemd etcd service
+  shell: systemctl start etcd.service
+
+- name: Start the systemd patroni service
+  shell: systemctl start patroni.service
+ 
+- name: Stop the systemd haproxy service
+  shell: systemctl stop haproxy.service
+ 
+- template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    owner: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+    mode: 0600
+ 
+ 
+# we need to set this so haproxy can be started
+- name: Set selinux context for ha proxy
+  shell: setsebool -P haproxy_connect_any=1
+ 
+- template:
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+    owner: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+    mode: 0600
+  with_items:
+    - { role: "{{ hostvars[inventory_hostname].keepalived_role }}" , priority: "{{ hostvars[inventory_hostname].keepalived_priority }}" }
+
+- name: Start the systemd haproxy service
+  shell: systemctl start haproxy.service
+

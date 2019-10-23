@@ -1,0 +1,14 @@
+#jinja2: trim_blocks:False
+##############################################
+# THIS FILE IS CONTROLLED BY ANSIBLE
+# any local modifications will be overwritten!
+########################################
+
+
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+# Ansible hosts 
+{%- for h in ansible_play_hosts %}
+{{ hostvars[h]['ansible_enp0s8']['ipv4']['address'] }} {{ hostvars[h]['ansible_hostname'] }}
+{% endfor %}

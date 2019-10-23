@@ -1,0 +1,206 @@
+- name: Install all dependencies for PostgreSQL 
+  yum: name={{item}} state=present
+  with_items:
+   - gcc
+   - openldap-devel
+   - python-devel
+   - readline-devel
+   - redhat-lsb
+   - bison
+   - flex
+   - perl-ExtUtils-Embed
+   - zlib-devel
+   - crypto-utils
+   - openssl-devel
+   - pam-devel
+   - libxml2-devel
+   - libxslt-devel
+   - openssh-clients
+   - bzip2
+   - net-tools
+   - wget
+   - screen
+   - unzip
+   - sysstat
+   - xorg-x11-xauth
+   - systemd-devel
+   - bash-completion
+ 
+- name: Remove iwl packages
+  yum: name={{item}} state=removed
+  with_items:
+   - iwl*
+ 
+- name: upgrade all packages
+  yum:
+    name: '*'
+    state: latest
+
+- name: check existence of postgres group
+  group:
+    name: "{{ postgres_group }}"
+    state: present
+
+- name: create postgres user and add him to group postgres
+  user:
+    name: "{{ postgres_user }}"
+    shell: /bin/bash
+    home: /home/{{ postgres_user }}
+    groups: "{{ postgres_user }}"
+    append: yes
+
+- name: add sudo postgres user to sudoers file
+  lineinfile:
+    path: /etc/sudoers
+    regexp: '^"{{ postgres_user }}"'
+    line: '"{{postgres_user}}"    ALL=(ALL)    NOPASSWD: ALL'
+    validate: 'visudo -cf %s'
+
+- name: create local folder 
+  file:
+    path: /u01/app/{{ postgres_user }}/local
+    state: directory
+    mode: 0700
+    recurse: yes
+    owner: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+ 
+- name: create /u01
+  file:
+    path: /u01
+    owner: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+    mode: 0700
+
+- name: create /u01/app 
+  file:
+    path: /u01/app
+    owner: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+    mode: 0700
+
+- name : create /u01/app subfolder 
+  file:
+    path: /u01/app/{{ postgres_user }}
+    owner: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+    mode: 0700
+
+- name: Create PGDATA 
+  file:
+    path: /u02/pgdata/
+    state: directory
+    mode: 0700
+    owner: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+ 
+- name: Create PGDATA subfolders
+  file:
+    path: /u02/pgdata/{{ postgresql_major_version }}
+    state: directory
+    mode: 0700
+    owner: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+ 
+- name: Create PGDATA subfolders
+  file:
+    path: /u02/pgdata/{{ postgresql_major_version }}/{{ cluster_name }}
+    state: directory
+    mode: 0700
+    owner: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+
+- name: Create Backup folders 
+  file:
+    path: /u99/pgdata/
+    state: directory
+    mode: 0700
+    owner: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+
+- name: create /etc/pgtab 
+  file:
+    path: /etc/pgtab
+    state: touch
+    owner: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+    mode: 0600
+ 
+- name: check if PostgreSQL source code exists
+  stat: 
+    path: /home/{{ postgres_user }}/source.tar.bz2
+  register: source_available
+ 
+- name: Download the PostgreSQL source code if it is not already there
+  get_url:
+    url: https://ftp.postgresql.org/pub/source/v{{ postgresql_version }}/postgresql-{{ postgresql_version }}.tar.bz2
+    dest: /home/{{ postgres_user }}/source.tar.bz2
+    mode: 0775
+  when: source_available.stat.exists == false
+ 
+- name: Check if PostgreSQL is already installed
+  stat:
+    path: /u01/app/{{ postgres_user }}/product/{{ dmk_postgresql_version }}/bin/postgres
+  register: postrgresql_is_installed
+ 
+- name: extract the sources when PostgreSQL is not already installed
+  shell: cd /home/{{ postgres_user }}; tar -axf source.tar.bz2
+  become: yes
+  become_user: "{{ postgres_user }}"
+  when: postrgresql_is_installed.stat.exists == false
+ 
+- name: Copy the compile.sh template
+  template:
+    src: compile.sh.j2
+    dest: /home/{{ postgres_user }}/postgresql-{{ postgresql_version }}/compile.sh
+    owner: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+    mode: 0700
+ 
+- name: Install PostgreSQL from source code
+  shell: cd /home/{{ postgres_user }}/postgresql-{{ postgresql_version }}; ./compile.sh
+  become: yes
+  become_user: "{{ postgres_user }}"
+  when: postrgresql_is_installed.stat.exists == false
+ 
+- name: check if DMK for PostgreSQL source code exists
+  stat:
+    path: /u01/app/{{ postgres_user }}/local/PostgreSQL-DMK-{{ dmk_version }}.zip
+  register: dmk_source_available
+ 
+- name: check if DMK for PostgreSQL is extracted
+  stat:
+    path: /u01/app/{{ postgres_user }}/local/dmk/bin/dmk.bash
+  register: dmk_extracted
+ 
+- name: Copy DMK source distribution
+  copy:
+    src: PostgreSQL-DMK-{{ dmk_version }}.zip
+    dest: /u01/app/{{ postgres_user }}/local/PostgreSQL-DMK-{{ dmk_version }}.zip
+    owner: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+    mode: 0700
+  when: dmk_source_available.stat.exists == false
+ 
+- name: extract DMK
+  shell: cd /u01/app/{{ postgres_user }}/local; unzip PostgreSQL-DMK-{{ dmk_version }}.zip
+  become: yes
+  become_user: "{{ postgres_user }}"
+  when: dmk_extracted.stat.exists == false
+ 
+- name: check if DMK is installed
+  stat:
+    path: /home/{{ postgres_user }}/.DMK_HOME
+  register: dmk_installed
+ 
+- lineinfile:
+    path: /etc/pgtab
+    line: 'pg{{ postgresql_version }}:/u01/app/{{ postgres_user }}/product/{{ dmk_postgresql_version }}:dummy:9999:D'
+    create: no
+  when: dmk_installed.stat.exists == false
+ 
+- name: Execute DMK for the first time
+  shell: /u01/app/{{ postgres_user }}/local/dmk/bin/dmk.bash; cat /u01/app/{{ postgres_user }}/local/dmk/templates/profile/dmk.postgres.profile >> /home/{{ postgres_user }}/.bash_profile
+  become: yes
+  become_user: "{{ postgres_user }}"
+  when: dmk_installed.stat.exists == false

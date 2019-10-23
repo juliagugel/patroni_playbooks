@@ -1,0 +1,49 @@
+[patroni-servers]
+192.168.22.111 keepalived_role=MASTER keepalived_priority=102 ansible_hostname=patroni1 ansible_hostname_fqdn=patroni1.it.dbi-services.com ansible_user=root
+192.168.22.112 keepalived_role=SLAVE keepalived_priority=101 ansible_hostname=patroni2 ansible_hostname_fqdn=patroni2.it.dbi-services.com ansible_user=root
+192.168.22.113 keepalived_role=SLAVE keepalived_priority=100 ansible_hostname=patroni3 ansible_hostname_fqdn=patroni3.it.dbi-services.com ansible_user=root
+
+[patroni-add-node]
+192.168.22.114 keepalived_role=SLAVE keepalived_priority=100 ansible_hostname=patroni4 ansible_hostname_fqdn=patroni4.it.dbi-services.com ansible_user=root
+
+[patroni-remove-node]
+192.168.22.111 keepalived_role=MASTER keepalived_priority=102 ansible_hostname=patroni1 ansible_hostname_fqdn=patroni1.it.dbi-services.com ansible_user=root
+192.168.22.112 keepalived_role=SLAVE keepalived_priority=101 ansible_hostname=patroni2 ansible_hostname_fqdn=patroni2.it.dbi-services.com ansible_user=root
+192.168.22.114 keepalived_role=SLAVE keepalived_priority=100 ansible_hostname=patroni4 ansible_hostname_fqdn=patroni4.it.dbi-services.com ansible_user=root
+
+[patroni-servers:vars]
+postgresql_version=11.5
+postgresql_major_version=11
+dmk_postgresql_version=11/db_5
+etcd_version=3.3.12
+postgres_user=postgres
+postgres_group=postgres
+dmk_version=19-04.2
+cluster_name=PG1
+blank=' '
+virtual_ip=192.168.22.115
+
+[patroni-add-node:vars]
+postgresql_version=11.5
+postgresql_major_version=11
+dmk_postgresql_version=11/db_5
+etcd_version=3.3.12
+postgres_user=postgres
+postgres_group=postgres
+dmk_version=19-04.2
+cluster_name=PG1
+blank=' '
+virtual_ip=192.168.22.115
+
+[patroni-remove-node:vars]
+postgresql_version=11.5
+postgresql_major_version=11
+dmk_postgresql_version=11/db_5
+etcd_version=3.3.12
+postgres_user=postgres
+postgres_group=postgres
+dmk_version=19-04.2
+cluster_name=PG1
+blank=' '
+virtual_ip=192.168.22.115
+
